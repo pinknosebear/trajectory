@@ -1,13 +1,41 @@
+import base64
 import datetime as dt
+import os
+import secrets
 from contextlib import closing
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.staticfiles import StaticFiles
 
 from db import connect
 from models import Checkin, CheckinRequest, DashboardResponse, GlucoseSeries, Kpi, Window
 import queries
 
 app = FastAPI(title="Trajectory API")
+
+# Optional shared-password gate. When DEMO_PASSWORD is set the whole app
+# (API + frontend) sits behind HTTP Basic auth; any username is accepted.
+# Unset (e.g. local dev) leaves everything open.
+DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD")
+
+
+@app.middleware("http")
+async def password_gate(request: Request, call_next):
+    if DEMO_PASSWORD:
+        header = request.headers.get("authorization", "")
+        supplied = ""
+        if header.startswith("Basic "):
+            try:
+                _, _, supplied = base64.b64decode(header[6:]).decode().partition(":")
+            except Exception:
+                supplied = ""
+        if not secrets.compare_digest(supplied, DEMO_PASSWORD):
+            return Response(
+                status_code=401,
+                headers={"WWW-Authenticate": 'Basic realm="Trajectory"'},
+            )
+    return await call_next(request)
 
 
 def _conn():
@@ -87,3 +115,10 @@ def checkin_today():
 def submit_checkin(payload: CheckinRequest):
     with closing(_conn()) as conn:
         return queries.upsert_checkin(conn, payload)
+
+
+# Serve the built React app, if present (production / Docker). Mounted last so
+# the /api routes above take precedence. html=True serves index.html at "/".
+STATIC_DIR = Path(__file__).with_name("static")
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

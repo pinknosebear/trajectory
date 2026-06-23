@@ -104,9 +104,43 @@ GET  /api/labs?marker=eGFR
 
 ## Tests
 
-Backend tests cover the derived-metric formulas (GMI, time in range, percent delta, composite score, Pearson correlation) and the dashboard/check-in API contracts:
+Backend tests cover the derived-metric formulas (GMI, time in range, percent delta, composite score, Pearson correlation) and the dashboard/check-in API contracts. The backend uses flat module imports, so run pytest from inside `backend/`:
 
 ```bash
 source .venv/bin/activate
-pytest backend/tests
+cd backend && pytest tests
 ```
+
+## Deployment (single container)
+
+For a shareable demo, the whole app ships as one Docker image: the React app is
+built and served as static files by the FastAPI backend, with the deterministic
+database seeded into the image at build time.
+
+Access is gated by an optional shared password. Set the `DEMO_PASSWORD`
+environment variable and the entire app (frontend + API) sits behind HTTP Basic
+auth — visitors get a browser login prompt and can enter any username with that
+password. Leave it unset for open access (e.g. local development).
+
+Build and run locally:
+
+```bash
+docker build -t trajectory .
+docker run -p 8000:8000 -e DEMO_PASSWORD=letmein trajectory
+# open http://localhost:8000
+```
+
+To deploy on a container host (Fly.io, Render, Railway, Cloud Run, etc.):
+
+- Point the host at this `Dockerfile`.
+- Set `DEMO_PASSWORD` as an environment variable / secret.
+- The container listens on `$PORT` (injected by most hosts; defaults to `8000`).
+
+Notes:
+
+- The SQLite database is rebuilt from the deterministic seed on every image
+  build, so all visitors see the same single-participant dataset. Check-ins
+  written at runtime live on the container's ephemeral filesystem and reset on
+  redeploy — fine for a demo. Add a persistent volume if you need them to stick.
+- This serves a single shared dataset; per-user accounts and data would require
+  auth and a multi-tenant database (a larger change).
