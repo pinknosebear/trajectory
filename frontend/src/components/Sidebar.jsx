@@ -20,17 +20,18 @@ export default function Sidebar({ view, onViewChange }) {
         <span>Trajectory</span>
       </div>
       <nav className="side-nav">
-        {nav.map(([label, enabled]) => (
-          <button
-            key={label}
-            className={view === label ? "active" : ""}
-            type="button"
-            disabled={!enabled}
-            onClick={() => enabled && onViewChange(label)}
-          >
-            {label}
-          </button>
-        ))}
+        {nav
+          .filter(([, enabled]) => enabled)
+          .map(([label]) => (
+            <button
+              key={label}
+              className={view === label ? "active" : ""}
+              type="button"
+              onClick={() => onViewChange(label)}
+            >
+              {label}
+            </button>
+          ))}
       </nav>
       <div className="profile-chip">
         <span>R</span>
