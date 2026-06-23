@@ -39,23 +39,12 @@ def pearson_r(xs, ys):
     n = len(pairs)
     if n < 2:
         return None
-backend/db.py
-Full file content failed to load
-import sqlite3
-from pathlib import Path
 
-from fastapi import HTTPException
-
-DB = Path(__file__).with_name("trajectory.db")
-
-
-def connect(db_path: Path | str = DB) -> sqlite3.Connection:
-    path = Path(db_path)
-    if not path.exists():
-        raise HTTPException(
-            500,
-            f"{path.name} missing - run `python backend/seed.py --full` first",
-        )
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    x_mean = mean(x for x, _ in pairs)
+    y_mean = mean(y for _, y in pairs)
+    x_dev = [x - x_mean for x, _ in pairs]
+    y_dev = [y - y_mean for _, y in pairs]
+    denominator = math.sqrt(sum(x * x for x in x_dev) * sum(y * y for y in y_dev))
+    if denominator == 0:
+        return None
+    return sum(x * y for x, y in zip(x_dev, y_dev)) / denominator

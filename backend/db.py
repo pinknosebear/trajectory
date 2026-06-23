@@ -6,8 +6,8 @@ from fastapi import HTTPException
 DB = Path(__file__).with_name("trajectory.db")
 
 
-def connect(db_path: Path | str = DB) -> sqlite3.Connection:
-    path = Path(db_path)
+def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
+    path = Path(db_path or DB)
     if not path.exists():
         raise HTTPException(
             500,

@@ -1,122 +1,92 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api.js";
 import { buildTokens } from "./tokens.js";
-import Briefing from "./components/Briefing.jsx";
-import MealResponse from "./components/MealResponse.jsx";
-import Goals from "./components/Goals.jsx";
+import Sidebar from "./components/Sidebar.jsx";
+import Overview from "./components/Overview.jsx";
+import Coach from "./components/Coach.jsx";
 
-// Swap these to re-skin (mirrors the Tweaks panel from the mockups).
 const t = buildTokens({ accent: "terracotta", surface: "warm", headline: "editorial" });
+const todayLabel = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+}).format(new Date());
 
 export default function App() {
-  const [data, setData] = useState(null);
+  const [view, setView] = useState("Overview");
+  const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState(null);
+  const checkinRef = useRef(null);
+
+  const cssVars = useMemo(
+    () => ({
+      "--bg": t.bg,
+      "--paper": t.paper,
+      "--ink": t.ink,
+      "--ink-2": t.ink2,
+      "--soft": t.soft,
+      "--faint": t.faint,
+      "--line": t.line,
+      "--accent": t.accent,
+      "--accent-soft": t.accentSoft,
+      "--accent-deep": t.accentDeep,
+      "--on-accent": t.onAccent,
+      "--good": t.good,
+      "--warn": t.warn,
+      "--danger": t.danger,
+      "--sidebar": t.sidebar,
+      "--sidebar-ink": t.sidebarInk,
+      "--display": t.display,
+      "--body": t.body,
+      "--mono": t.mono,
+    }),
+    []
+  );
 
   useEffect(() => {
-    Promise.all([
-      api.briefing(),
-      api.goals(),
-      api.mealResponse("Rice & dal"),
-    ])
-      .then(([briefing, goals, meal]) => setData({ briefing, goals, meal }))
+    api
+      .dashboard("7d")
+      .then(setDashboard)
       .catch((e) => setError(e.message));
   }, []);
 
-  if (error)
-    return (
-      <div className="center-msg">
-        {error} — is the backend running? (uvicorn main:app --reload)
-      </div>
-    );
-  if (!data) return <div className="center-msg">Loading…</div>;
+  function focusCheckin() {
+    setView("Overview");
+    window.setTimeout(() => {
+      checkinRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }
+
+  if (error) {
+    return <div className="center-msg">{error} - is the backend running?</div>;
+  }
 
   return (
-    <div style={{ background: t.bg, color: t.ink, minHeight: "100vh" }}>
-      {/* top bar */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "20px 48px",
-          borderBottom: `1px solid ${t.line}`,
-          background: t.paper,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <BrandMark t={t} />
-          <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.2 }}>
-            Trajectory
-          </span>
-        </div>
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 26,
-            fontSize: 14,
-            color: t.soft,
-          }}
-        >
-          <span>Overview</span>
-          <span>Goals</span>
-          <span>Glucose</span>
-          <span>Experiments</span>
-          <span
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              background: t.accentSoft,
-              color: t.accentDeep,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 600,
-              fontSize: 13,
-            }}
-          >
-            R
-          </span>
-        </nav>
-      </header>
-
-      <main className="wrap">
-        <Briefing data={data.briefing} t={t} />
-        <MealResponse data={data.meal} t={t} />
-        <Goals data={data.goals} t={t} />
+    <div className="app-shell" style={cssVars}>
+      <Sidebar view={view} onViewChange={setView} />
+      <main className="content">
+        <header className="page-header">
+          <div>
+            <h1>{view}</h1>
+            <p>{todayLabel} · last 7d vs prior 7d</p>
+          </div>
+          <button className="primary-button" type="button" onClick={focusCheckin}>
+            + Check-in
+          </button>
+        </header>
+        {!dashboard ? (
+          <div className="panel empty-state">Loading overview…</div>
+        ) : view === "Coach" ? (
+          <Coach t={t} />
+        ) : (
+          <Overview
+            dashboard={dashboard}
+            setDashboard={setDashboard}
+            checkinRef={checkinRef}
+            t={t}
+          />
+        )}
       </main>
     </div>
-  );
-}
-
-function BrandMark({ t, size = 24 }) {
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size * 0.27,
-        background: t.accent,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <svg
-        width={size * 0.62}
-        height={size * 0.62}
-        viewBox="0 0 16 16"
-        fill="none"
-        stroke={t.onAccent}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M2 11 L6 7 L9 9.5 L14 4" />
-        <path d="M10.5 4 L14 4 L14 7.5" />
-      </svg>
-    </span>
   );
 }
